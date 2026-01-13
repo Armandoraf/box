@@ -26,6 +26,7 @@ mkdir -p "$APP_DIR" "$ENV_DIR"
 
 if [[ -n "$REPO_URL" ]]; then
   if [[ ! -d "$APP_DIR/.git" ]]; then
+    rm -rf "$APP_DIR"
     git clone "$REPO_URL" "$APP_DIR"
   fi
   (cd "$APP_DIR" && git fetch --all && git checkout "$GIT_REF" && git pull)
