@@ -27,8 +27,16 @@ def search_endpoint(
     q: str = Query(..., description="Search query"),
     news: bool = Query(False, description="Use Google News"),
     chrome_debug_port: int = Query(9225, ge=1, le=65535),
+    block_media: bool = Query(
+        False, description="Block images/audio/video while loading results"
+    ),
 ):
     try:
-        return search_google(q, news=news, chrome_debug_port=chrome_debug_port)
+        return search_google(
+            q,
+            news=news,
+            chrome_debug_port=chrome_debug_port,
+            block_media=block_media,
+        )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

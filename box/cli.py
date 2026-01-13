@@ -24,6 +24,7 @@ def _search_cmd(args: argparse.Namespace) -> int:
             args.query,
             news=args.news,
             chrome_debug_port=args.chrome_debug_port,
+            block_media=args.block_media,
         )
     except Exception as exc:
         print(json.dumps({"error": str(exc), "query": args.query}), file=sys.stderr)
@@ -57,6 +58,11 @@ def build_parser() -> argparse.ArgumentParser:
     search_parser.add_argument("query", help="Search query")
     search_parser.add_argument("--news", action="store_true")
     search_parser.add_argument("--chrome-debug-port", type=int, default=9225)
+    search_parser.add_argument(
+        "--block-media",
+        action="store_true",
+        help="Block images/audio/video while loading results.",
+    )
     search_parser.set_defaults(func=_search_cmd)
 
     return parser

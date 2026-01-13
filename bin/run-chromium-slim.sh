@@ -9,15 +9,18 @@ if docker ps -q --filter "name=^/${CONTAINER_NAME}$" | grep -q .; then
   docker stop "$CONTAINER_NAME" >/dev/null
 fi
 
-# Build image
+# Stop any container already binding port 9225
+if docker ps -q --filter "publish=9225" | grep -q .; then
+  docker ps -q --filter "publish=9225" | xargs docker stop >/dev/null
+fi
+
+# Build slim image
 docker build -t "$IMAGE_NAME" .
 
-# Run container in background with long-lived Chromium process
+# Run container in background (headless Chromium)
 exec docker run -d --rm \
   --name "$CONTAINER_NAME" \
   --shm-size=2g \
   -p 9225:9225 \
-  -p 5900:5900 \
-  -p 6080:6080 \
-  -e CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --display=:99 --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 about:blank" \
+  -e CHROME_BLOCK_MEDIA=1 \
   "$IMAGE_NAME"

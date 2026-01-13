@@ -53,7 +53,11 @@ def _normalize_text(text: str) -> str:
     return stripped.strip()
 
 
-async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
+async def _navigate_and_extract(
+    ws_url: str,
+    url: str,
+    block_media: bool = False,
+) -> list[dict]:
     msg_id = 0
 
     async def send_cmd(ws, method: str, params: dict | None = None) -> dict:
@@ -71,6 +75,36 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
     async with websockets.connect(ws_url) as ws:
         await send_cmd(ws, "Runtime.enable")
         await send_cmd(ws, "Page.enable")
+        if block_media:
+            await send_cmd(ws, "Network.enable")
+            await send_cmd(
+                ws,
+                "Network.setBlockedURLs",
+                {
+                    "urls": [
+                        "*.jpg",
+                        "*.jpeg",
+                        "*.png",
+                        "*.gif",
+                        "*.webp",
+                        "*.svg",
+                        "*.ico",
+                        "*.bmp",
+                        "*.mp4",
+                        "*.webm",
+                        "*.m3u8",
+                        "*.mov",
+                        "*.avi",
+                        "*.mkv",
+                        "*.mp3",
+                        "*.wav",
+                        "*.flac",
+                        "*.ogg",
+                        "*.woff",
+                        "*.woff2",
+                    ]
+                },
+            )
 
         await send_cmd(ws, "Page.navigate", {"url": url})
 
@@ -121,7 +155,7 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
     if (best) return best;
 
     const lines = (root.innerText || '')
-      .split('\n')
+      .split('\\n')
       .map((l) => l.trim())
       .filter(Boolean);
     const filtered = lines.filter((l) => l !== t && l !== src && l !== ts);
@@ -198,6 +232,10 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
             "Runtime.evaluate",
             {"expression": js, "returnByValue": True},
         )
+        if resp.get("exceptionDetails"):
+            raise RuntimeError(
+                f"Search extraction JS error: {resp['exceptionDetails']}"
+            )
         result = resp.get("result", {}).get("result", {}).get("value", [])
         if isinstance(result, list):
             dedup: dict[str, dict] = {}
@@ -226,7 +264,12 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
         return []
 
 
-def search_google(query: str, news: bool = False, chrome_debug_port: int | None = None) -> dict:
+def search_google(
+    query: str,
+    news: bool = False,
+    chrome_debug_port: int | None = None,
+    block_media: bool | None = None,
+) -> dict:
     url = (
         "https://www.google.com/search?q="
         + urllib.parse.quote_plus(query)
@@ -236,6 +279,8 @@ def search_google(query: str, news: bool = False, chrome_debug_port: int | None 
         url += "&tbm=nws"
 
     port = chrome_debug_port or int(os.environ.get("CHROME_DEBUG_PORT", "9225"))
+    if block_media is None:
+        block_media = os.environ.get("CHROME_BLOCK_MEDIA", "0") == "1"
     list_url = f"http://localhost:{port}/json/list"
 
     targets = _json_get(list_url)
@@ -247,5 +292,11 @@ def search_google(query: str, news: bool = False, chrome_debug_port: int | None 
         if not page or not page.get("webSocketDebuggerUrl"):
             raise RuntimeError("No existing page target found. Open a tab first.")
 
-    results = asyncio.run(_navigate_and_extract(page["webSocketDebuggerUrl"], url))
+    results = asyncio.run(
+        _navigate_and_extract(
+            page["webSocketDebuggerUrl"],
+            url,
+            block_media=block_media,
+        )
+    )
     return {"query": query, "url": url, "results": results}

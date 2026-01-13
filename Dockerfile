@@ -1,25 +1,36 @@
 FROM debian:bookworm-slim
 
-# Keep image small; Chromium + Xvfb + fonts
+ARG DEBUG_IMAGE=0
+ARG INCLUDE_NOVNC=0
+
+# Keep image small; debug deps are optional.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
        chromium \
-       xvfb \
        ca-certificates \
        fonts-liberation \
-       fonts-noto-color-emoji \
        socat \
-       x11vnc \
-       novnc \
-       websockify \
        dumb-init \
-  && rm -rf /var/lib/apt/lists/*
-
-ENV DISPLAY=:99
+  && if [ "$DEBUG_IMAGE" = "1" ]; then \
+       apt-get install -y --no-install-recommends \
+         xvfb \
+         x11vnc; \
+     fi \
+  && if [ "$INCLUDE_NOVNC" = "1" ]; then \
+       apt-get install -y --no-install-recommends \
+         novnc \
+         websockify; \
+     fi \
+  && rm -rf /var/lib/apt/lists/* \
+  && rm -rf /usr/share/doc /usr/share/man /usr/share/info /usr/share/locale /usr/share/icons
 
 # Default args; override at runtime if needed
-ENV CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --display=:99 --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 about:blank"
+ENV CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-blink-features=AutomationControlled --disable-features=IsolateOrigins,site-per-process --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 about:blank"
+ENV CHROMIUM_ARGS_DEBUG="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-blink-features=AutomationControlled --disable-features=IsolateOrigins,site-per-process --display=:99 --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 about:blank"
+ENV DEBUG=0
+ENV ENABLE_NOVNC=
 
-# Start Xvfb and Chromium in the foreground
+COPY bin/start-chromium.sh /usr/local/bin/start-chromium
+
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["bash", "-lc", "Xvfb :99 -screen 0 1280x720x24 & x11vnc -display :99 -forever -shared -rfbport 5900 -nopw & websockify --web=/usr/share/novnc 6080 localhost:5900 & socat TCP-LISTEN:9225,fork,bind=0.0.0.0 TCP:127.0.0.1:9223 & exec chromium $CHROMIUM_ARGS"]
+CMD ["/usr/local/bin/start-chromium"]
