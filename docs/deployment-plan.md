@@ -120,7 +120,7 @@ Logs:
 ## Deployment Steps (high level)
 
 1) Build container image that runs FastAPI + Chromium/Xvfb.
-2) Provision 5 VMs with static external IPs.
+2) Provision 5 VMs with static external IPs (see `infra/terraform`).
 3) Deploy the container to each VM (systemd or Docker).
 4) Deploy Router service (VM or managed service).
 5) Configure Cloud HTTP(S) Load Balancer to route to Router.

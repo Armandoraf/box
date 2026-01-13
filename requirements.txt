@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+trafilatura
+curl_cffi
+websockets
+lxml_html_clean
+httpx

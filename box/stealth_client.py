@@ -100,8 +100,6 @@ def _select_browser() -> Tuple[BrowserType, str]:
     weights = {
         BrowserType.CHROME_WIN: 35,
         BrowserType.CHROME_MAC: 20,
-        BrowserType.FIREFOX_WIN: 10,
-        BrowserType.FIREFOX_MAC: 5,
         BrowserType.SAFARI_MAC: 10,
         BrowserType.EDGE_WIN: 10,
         BrowserType.CHROME_ANDROID: 5,
