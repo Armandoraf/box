@@ -1,1 +1,10 @@
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Local
+.DS_Store
 __pycache__/
