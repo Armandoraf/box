@@ -20,12 +20,7 @@ def _fetch_cmd(args: argparse.Namespace) -> int:
 
 def _search_cmd(args: argparse.Namespace) -> int:
     try:
-        payload = search_google(
-            args.query,
-            news=args.news,
-            chrome_debug_port=args.chrome_debug_port,
-            block_media=args.block_media,
-        )
+        payload = search_google(args.query)
     except Exception as exc:
         print(json.dumps({"error": str(exc), "query": args.query}), file=sys.stderr)
         return 1
@@ -54,15 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
     fetch_parser.add_argument("--user-agent", default=DEFAULT_USER_AGENT)
     fetch_parser.set_defaults(func=_fetch_cmd)
 
-    search_parser = sub.add_parser("search", help="Search via Chromium CDP")
+    search_parser = sub.add_parser("search", help="Search via Custom Search API")
     search_parser.add_argument("query", help="Search query")
-    search_parser.add_argument("--news", action="store_true")
-    search_parser.add_argument("--chrome-debug-port", type=int, default=9225)
-    search_parser.add_argument(
-        "--block-media",
-        action="store_true",
-        help="Block images/audio/video while loading results.",
-    )
     search_parser.set_defaults(func=_search_cmd)
 
     return parser
