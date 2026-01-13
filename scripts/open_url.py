@@ -22,7 +22,7 @@ def main() -> int:
         return 0
     except Exception as exc:
         print(f"Failed to open URL via CDP: {exc}")
-        print("Is the Chromium container running with remote debugging on port 9222?")
+        print("Is the Chromium container running with remote debugging on port 9225?")
         return 1
 
 
