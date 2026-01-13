@@ -16,6 +16,8 @@ docker build -t "$IMAGE_NAME" .
 exec docker run -d --rm \
   --name "$CONTAINER_NAME" \
   --shm-size=2g \
-  -p 9222:9222 \
+  -p 9225:9225 \
+  -p 5900:5900 \
+  -p 6080:6080 \
   -e CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --display=:99 --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 about:blank" \
   "$IMAGE_NAME"

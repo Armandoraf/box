@@ -10,6 +10,9 @@ RUN apt-get update \
        fonts-noto-color-emoji \
        socat \
        iproute2 \
+       x11vnc \
+       novnc \
+       websockify \
        dumb-init \
   && rm -rf /var/lib/apt/lists/*
 
@@ -20,4 +23,4 @@ ENV CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --display=
 
 # Start Xvfb and Chromium in the foreground
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["bash", "-lc", "Xvfb :99 -screen 0 1280x720x24 & socat TCP-LISTEN:9222,fork,bind=0.0.0.0 TCP:127.0.0.1:9223 & exec chromium $CHROMIUM_ARGS"]
+CMD ["bash", "-lc", "Xvfb :99 -screen 0 1280x720x24 & x11vnc -display :99 -forever -shared -rfbport 5900 -nopw & websockify --web=/usr/share/novnc 6080 localhost:5900 & socat TCP-LISTEN:9225,fork,bind=0.0.0.0 TCP:127.0.0.1:9223 & exec chromium $CHROMIUM_ARGS"]
