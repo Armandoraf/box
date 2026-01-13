@@ -1,4 +1,7 @@
 fastapi
+uvicorn
+gunicorn
 trafilatura
 curl_cffi
 python-dotenv
+pypdf

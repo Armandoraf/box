@@ -87,6 +87,10 @@ def fetch(
     }
     extra_headers = {k: v for k, v in headers.items() if k not in blocked}
     resp = stealth_get(url, timeout=timeout, extra_headers=extra_headers or None)
+    if resp.status_code >= 400:
+        raise RuntimeError(
+            f"Upstream HTTP error {resp.status_code} while fetching {resp.url}"
+        )
     content_type = (
         (resp.headers.get("content-type") or "").split(";")[0].strip().lower()
     )
@@ -94,10 +98,14 @@ def fetch(
     html = resp.text or ""
     if is_pdf:
         extracted = _extract_pdf_text(resp.content)
+        if resp.content and not extracted:
+            raise RuntimeError("PDF text extraction produced no text")
         raw_text = extracted if include_raw_text else ""
         html = ""
     else:
         extracted = _extract_trafilatura(html) if html else None
+        if html and extracted is None:
+            raise RuntimeError("HTML content extraction failed")
         raw_text = _to_text(html) if (include_raw_text and html) else ""
     return {
         "final_url": str(resp.url),
