@@ -1,5 +1,4 @@
 import os
-import threading
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 
@@ -7,7 +6,6 @@ from webox.fetch import DEFAULT_USER_AGENT, build_headers, fetch
 from webox.search import search_google
 
 app = FastAPI(title="webox")
-_SEARCH_LOCK = threading.Lock()
 _API_KEY = os.environ.get("WEBOX_API_KEY", "")
 
 
@@ -41,26 +39,9 @@ def fetch_endpoint(
 @app.get("/search")
 def search_endpoint(
     q: str = Query(..., description="Search query"),
-    news: bool = Query(False, description="Use Google News"),
-    chrome_debug_port: int = Query(9225, ge=1, le=65535),
-    block_media: bool = Query(
-        False, description="Block images/audio/video while loading results"
-    ),
     _: None = Depends(_require_api_key),
 ):
-    if not _SEARCH_LOCK.acquire(blocking=False):
-        raise HTTPException(
-            status_code=429,
-            detail="Search is busy on this runner. Please retry shortly.",
-        )
     try:
-        return search_google(
-            q,
-            news=news,
-            chrome_debug_port=chrome_debug_port,
-            block_media=block_media,
-        )
+        return search_google(q)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    finally:
-        _SEARCH_LOCK.release()
