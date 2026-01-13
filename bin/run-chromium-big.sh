@@ -41,5 +41,5 @@ fi
 
 exec docker run \
   "${RUN_ARGS[@]}" \
-  -e CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --display=:99 --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 about:blank" \
+  -e CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --display=:99 --remote-debugging-address=127.0.0.1 --remote-debugging-port=9223 about:blank" \
   "$IMAGE_NAME"

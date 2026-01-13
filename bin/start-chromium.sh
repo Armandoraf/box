@@ -13,9 +13,9 @@ if [[ "${DEBUG:-0}" == "1" ]]; then
     websockify --web=/usr/share/novnc 6080 localhost:5900 &
   fi
 
-  socat TCP-LISTEN:9225,fork,bind=0.0.0.0 TCP:127.0.0.1:9223 &
+  socat TCP-LISTEN:9225,fork,bind=127.0.0.1 TCP:127.0.0.1:9223 &
   exec chromium $CHROMIUM_ARGS_DEBUG
 fi
 
-socat TCP-LISTEN:9225,fork,bind=0.0.0.0 TCP:127.0.0.1:9223 &
+socat TCP-LISTEN:9225,fork,bind=127.0.0.1 TCP:127.0.0.1:9223 &
 exec chromium --headless=new $CHROMIUM_ARGS

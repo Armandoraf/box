@@ -25,8 +25,8 @@ RUN apt-get update \
   && rm -rf /usr/share/doc /usr/share/man /usr/share/info /usr/share/locale /usr/share/icons
 
 # Default args; override at runtime if needed
-ENV CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-blink-features=AutomationControlled --disable-features=IsolateOrigins,site-per-process --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 about:blank"
-ENV CHROMIUM_ARGS_DEBUG="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-blink-features=AutomationControlled --disable-features=IsolateOrigins,site-per-process --display=:99 --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 about:blank"
+ENV CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-blink-features=AutomationControlled --disable-features=IsolateOrigins,site-per-process --remote-debugging-address=127.0.0.1 --remote-debugging-port=9223 about:blank"
+ENV CHROMIUM_ARGS_DEBUG="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-blink-features=AutomationControlled --disable-features=IsolateOrigins,site-per-process --display=:99 --remote-debugging-address=127.0.0.1 --remote-debugging-port=9223 about:blank"
 ENV DEBUG=0
 ENV ENABLE_NOVNC=
 

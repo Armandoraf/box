@@ -1,9 +1,24 @@
-from fastapi import FastAPI, HTTPException, Query
+import os
+import threading
+
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 
 from box.fetch import DEFAULT_USER_AGENT, build_headers, fetch
 from box.search import search_google
 
 app = FastAPI(title="box")
+_SEARCH_LOCK = threading.Lock()
+_API_KEY = os.environ.get("BOX_API_KEY", "")
+
+
+def _require_api_key(x_api_key: str | None = Header(None)) -> None:
+    if _API_KEY and x_api_key != _API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+@app.get("/healthz")
+def healthz() -> dict:
+    return {"ok": True}
 
 
 @app.get("/fetch")
@@ -14,6 +29,7 @@ def fetch_endpoint(
     raw_text: bool = Query(False, description="Include raw text extraction"),
     user_agent: str = Query(DEFAULT_USER_AGENT),
     accept_language: str = Query("en-US,en;q=0.9"),
+    _: None = Depends(_require_api_key),
 ):
     headers = build_headers(user_agent, accept_language)
     try:
@@ -30,7 +46,13 @@ def search_endpoint(
     block_media: bool = Query(
         False, description="Block images/audio/video while loading results"
     ),
+    _: None = Depends(_require_api_key),
 ):
+    if not _SEARCH_LOCK.acquire(blocking=False):
+        raise HTTPException(
+            status_code=429,
+            detail="Search is busy on this runner. Please retry shortly.",
+        )
     try:
         return search_google(
             q,
@@ -40,3 +62,5 @@ def search_endpoint(
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    finally:
+        _SEARCH_LOCK.release()
