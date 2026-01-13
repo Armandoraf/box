@@ -13,7 +13,8 @@ def main() -> int:
     endpoint = "http://localhost:9222/json/new?" + urllib.parse.quote(url, safe="")
 
     try:
-        with urllib.request.urlopen(endpoint, timeout=5) as resp:
+        req = urllib.request.Request(endpoint, method="PUT")
+        with urllib.request.urlopen(req, timeout=5) as resp:
             body = resp.read().decode("utf-8", errors="replace")
         print(body)
         return 0

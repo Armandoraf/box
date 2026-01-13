@@ -9,6 +9,7 @@ RUN apt-get update \
        fonts-liberation \
        fonts-noto-color-emoji \
        socat \
+       iproute2 \
        dumb-init \
   && rm -rf /var/lib/apt/lists/*
 

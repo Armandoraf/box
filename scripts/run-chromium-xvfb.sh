@@ -4,9 +4,6 @@ set -euo pipefail
 IMAGE_NAME=${IMAGE_NAME:-box-chromium-xvfb}
 CONTAINER_NAME=${CONTAINER_NAME:-box-chromium-xvfb}
 
-# Optional URL (default about:blank)
-URL=${1:-about:blank}
-
 # Stop existing container if running
 if docker ps -q --filter "name=^/${CONTAINER_NAME}$" | grep -q .; then
   docker stop "$CONTAINER_NAME" >/dev/null
@@ -20,5 +17,5 @@ exec docker run -d --rm \
   --name "$CONTAINER_NAME" \
   --shm-size=2g \
   -p 9222:9222 \
-  -e CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --display=:99 --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 $URL" \
+  -e CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --display=:99 --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 about:blank" \
   "$IMAGE_NAME"
