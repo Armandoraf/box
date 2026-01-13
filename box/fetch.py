@@ -10,12 +10,6 @@ except Exception as exc:  # pragma: no cover
         "Missing dependency: trafilatura. Install with: pip install trafilatura"
     ) from exc
 
-DEFAULT_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/120.0.0.0 Safari/537.36"
-)
-
 
 class _TextExtractor(html.parser.HTMLParser):
     def __init__(self) -> None:
@@ -47,18 +41,6 @@ def _extract_trafilatura(html: str) -> Optional[str]:
     )
 
 
-def build_headers(user_agent: str, accept_language: str) -> Dict[str, str]:
-    return {
-        "User-Agent": user_agent,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": accept_language,
-        "Accept-Encoding": "gzip, deflate, br",
-        "DNT": "1",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-    }
-
-
 def fetch(
     url: str,
     timeout: float,
@@ -66,7 +48,25 @@ def fetch(
     include_raw: bool,
     include_raw_text: bool,
 ) -> Dict[str, object]:
-    resp = stealth_get(url, timeout=timeout, extra_headers=headers)
+    # Avoid overriding stealth client UA and browser fingerprint headers.
+    blocked = {
+        "User-Agent",
+        "Accept",
+        "Accept-Language",
+        "Accept-Encoding",
+        "DNT",
+        "Connection",
+        "Upgrade-Insecure-Requests",
+        "Sec-Fetch-Dest",
+        "Sec-Fetch-Mode",
+        "Sec-Fetch-Site",
+        "Sec-Fetch-User",
+        "sec-ch-ua",
+        "sec-ch-ua-mobile",
+        "sec-ch-ua-platform",
+    }
+    extra_headers = {k: v for k, v in headers.items() if k not in blocked}
+    resp = stealth_get(url, timeout=timeout, extra_headers=extra_headers or None)
     html = resp.text or ""
     extracted = _extract_trafilatura(html) if html else None
     raw_text = _to_text(html) if (include_raw_text and html) else ""
