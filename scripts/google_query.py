@@ -83,7 +83,9 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
 (() => {
   if (location.href.includes('consent.google.com')) return false;
   const h3s = document.querySelectorAll('a h3');
-  return h3s.length > 0;
+  const newsCards = document.querySelectorAll('div.dbsr, article, g-card');
+  const headings = document.querySelectorAll('[role=\"heading\"], .nDgy9d, .JheGif');
+  return h3s.length > 0 || newsCards.length > 0 || headings.length > 0;
 })();
 """
             resp = await send_cmd(
@@ -100,7 +102,70 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
 
         js = """
 (() => {
-  // Handle multiple Google layouts
+  const isNews = new URLSearchParams(location.search).get('tbm') === 'nws';
+
+  const pickSnippet = (root, t, src, ts) => {
+    const candidates = Array.from(
+      root.querySelectorAll(
+        '.Y3v8qd, .GI74Re, .st, .VwiC3b, .aCOpRe, .r025kc, .WWztTb'
+      )
+    );
+    let best = '';
+    for (const el of candidates) {
+      if (el.closest('.CEMjEf')) continue; // skip source/time area
+      const s = el.textContent?.trim() || '';
+      if (!s || s === t || s === src || s === ts) continue;
+      if (s.length > best.length) best = s;
+    }
+    if (best) return best;
+
+    const lines = (root.innerText || '')
+      .split('\\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const filtered = lines.filter((l) => l !== t && l !== src && l !== ts);
+    // Prefer a longer line that looks like a sentence
+    let fallback = '';
+    for (const line of filtered) {
+      if (line.length > fallback.length) fallback = line;
+    }
+    return fallback;
+  };
+
+  if (isNews) {
+    const results = [];
+    const cards = Array.from(document.querySelectorAll('div.dbsr'));
+    for (const card of cards) {
+      const a = card.querySelector('a');
+      const title = card.querySelector('.JheGif, .nDgy9d');
+      const source = card.querySelector('.CEMjEf span');
+      const time = card.querySelector('time');
+      if (!a || !title) continue;
+      const link = a.getAttribute('href') || '';
+      const t = title.textContent?.trim() || '';
+      const src = source ? (source.textContent?.trim() || '') : '';
+      const ts = time ? (time.textContent?.trim() || '') : '';
+      const s = pickSnippet(card, t, src, ts);
+      if (t && link) results.push({ title: t, link, snippet: s, source: src, time: ts });
+    }
+    if (results.length > 0) return results;
+
+    // Fallback for newer/alternate news layouts
+    const fallback = [];
+    const anchors = Array.from(document.querySelectorAll('#search a, #rso a'));
+    for (const a of anchors) {
+      const title = a.querySelector('h3, [role=\"heading\"], .nDgy9d, .JheGif, .mCBkyc');
+      const root = a.closest('article, g-card, div') || a;
+      if (!title) continue;
+      const link = a.getAttribute('href') || '';
+      const t = title.textContent?.trim() || '';
+      const s = pickSnippet(root, t, '', '');
+      if (t && link) fallback.push({ title: t, link, snippet: s });
+    }
+    return fallback;
+  }
+
+  // Handle multiple web layouts
   const blocks = Array.from(
     document.querySelectorAll('div#search div.MjjYud, div#search div.g, div#search .tF2Cxc')
   );
@@ -166,16 +231,24 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
 
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print("Usage: scripts/google_query.py <query>")
+    args = sys.argv[1:]
+    news = False
+    if "--news" in args:
+        news = True
+        args = [a for a in args if a != "--news"]
+
+    if len(args) < 1:
+        print("Usage: scripts/google_query.py [--news] <query>")
         return 2
 
-    query = " ".join(sys.argv[1:])
+    query = " ".join(args)
     url = (
         "https://www.google.com/search?q="
         + urllib.parse.quote_plus(query)
         + "&hl=en&gl=us"
     )
+    if news:
+        url += "&tbm=nws"
 
     port = os.environ.get("CHROME_DEBUG_PORT", "9225")
     list_url = f"http://localhost:{port}/json/list"
