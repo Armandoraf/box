@@ -3,12 +3,12 @@ import threading
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 
-from box.fetch import DEFAULT_USER_AGENT, build_headers, fetch
-from box.search import search_google
+from webox.fetch import DEFAULT_USER_AGENT, build_headers, fetch
+from webox.search import search_google
 
-app = FastAPI(title="box")
+app = FastAPI(title="webox")
 _SEARCH_LOCK = threading.Lock()
-_API_KEY = os.environ.get("BOX_API_KEY", "")
+_API_KEY = os.environ.get("WEBOX_API_KEY", "")
 
 
 def _require_api_key(x_api_key: str | None = Header(None)) -> None:

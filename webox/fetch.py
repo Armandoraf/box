@@ -1,13 +1,21 @@
 import html.parser
+import io
 from typing import Dict, Optional
 
-from box.stealth_client import stealth_get
+from webox.stealth_client import stealth_get
 
 try:
     import trafilatura
 except Exception as exc:  # pragma: no cover
     raise ImportError(
         "Missing dependency: trafilatura. Install with: pip install trafilatura"
+    ) from exc
+
+try:
+    from pypdf import PdfReader
+except Exception as exc:  # pragma: no cover
+    raise ImportError(
+        "Missing dependency: pypdf. Install with: pip install pypdf"
     ) from exc
 
 
@@ -41,6 +49,18 @@ def _extract_trafilatura(html: str) -> Optional[str]:
     )
 
 
+def _extract_pdf_text(content_bytes: bytes) -> str:
+    if not content_bytes:
+        return ""
+    reader = PdfReader(io.BytesIO(content_bytes))
+    chunks = []
+    for page in reader.pages:
+        text = page.extract_text() or ""
+        if text:
+            chunks.append(text)
+    return "\n\n".join(chunks).strip()
+
+
 def fetch(
     url: str,
     timeout: float,
@@ -67,9 +87,18 @@ def fetch(
     }
     extra_headers = {k: v for k, v in headers.items() if k not in blocked}
     resp = stealth_get(url, timeout=timeout, extra_headers=extra_headers or None)
+    content_type = (
+        (resp.headers.get("content-type") or "").split(";")[0].strip().lower()
+    )
+    is_pdf = content_type == "application/pdf" or str(resp.url).lower().endswith(".pdf")
     html = resp.text or ""
-    extracted = _extract_trafilatura(html) if html else None
-    raw_text = _to_text(html) if (include_raw_text and html) else ""
+    if is_pdf:
+        extracted = _extract_pdf_text(resp.content)
+        raw_text = extracted if include_raw_text else ""
+        html = ""
+    else:
+        extracted = _extract_trafilatura(html) if html else None
+        raw_text = _to_text(html) if (include_raw_text and html) else ""
     return {
         "final_url": str(resp.url),
         "status_code": resp.status_code,

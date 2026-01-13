@@ -3,8 +3,8 @@ import argparse
 import json
 import sys
 
-from box.fetch import fetch
-from box.search import search_google
+from webox.fetch import fetch
+from webox.search import search_google
 
 
 def _fetch_cmd(args: argparse.Namespace) -> int:
@@ -28,7 +28,7 @@ def _search_cmd(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Minimal CLI for box")
+    parser = argparse.ArgumentParser(description="Minimal CLI for webox")
     sub = parser.add_subparsers(dest="command", required=True)
 
     fetch_parser = sub.add_parser("fetch", help="Fetch a URL")
