@@ -9,7 +9,6 @@ RUN apt-get update \
        fonts-liberation \
        fonts-noto-color-emoji \
        socat \
-       iproute2 \
        x11vnc \
        novnc \
        websockify \

@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
 import asyncio
 import json
 import os
-import sys
 import urllib.parse
 import urllib.request
 import unicodedata
@@ -15,13 +13,19 @@ def _json_get(url: str) -> object:
         return json.loads(resp.read().decode("utf-8", errors="replace"))
 
 
+def _open_tab(port: int, url: str) -> None:
+    endpoint = f"http://localhost:{port}/json/new?" + urllib.parse.quote(url, safe="")
+    req = urllib.request.Request(endpoint, method="PUT")
+    with urllib.request.urlopen(req, timeout=5):
+        return
+
+
 def _normalize_link(link: str) -> str:
     try:
         parsed = urllib.parse.urlparse(link)
     except Exception:
         return link
 
-    # Drop fragment; strip common tracking/query params
     query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
     drop_keys = {
         "srsltid",
@@ -44,7 +48,6 @@ def _normalize_link(link: str) -> str:
 
 
 def _normalize_text(text: str) -> str:
-    # Normalize Unicode and strip combining marks (e.g., stray diacritics)
     normalized = unicodedata.normalize("NFKD", text)
     stripped = "".join(ch for ch in normalized if not unicodedata.combining(ch))
     return stripped.strip()
@@ -71,13 +74,11 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
 
         await send_cmd(ws, "Page.navigate", {"url": url})
 
-        # Wait for load event (best-effort)
         for _ in range(200):
             msg = json.loads(await ws.recv())
             if msg.get("method") == "Page.loadEventFired":
                 break
 
-        # Poll for results to appear (Google can load late or show consent pages)
         async def has_results() -> bool:
             check_js = """
 (() => {
@@ -112,7 +113,7 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
     );
     let best = '';
     for (const el of candidates) {
-      if (el.closest('.CEMjEf')) continue; // skip source/time area
+      if (el.closest('.CEMjEf')) continue;
       const s = el.textContent?.trim() || '';
       if (!s || s === t || s === src || s === ts) continue;
       if (s.length > best.length) best = s;
@@ -120,11 +121,10 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
     if (best) return best;
 
     const lines = (root.innerText || '')
-      .split('\\n')
+      .split('\n')
       .map((l) => l.trim())
       .filter(Boolean);
     const filtered = lines.filter((l) => l !== t && l !== src && l !== ts);
-    // Prefer a longer line that looks like a sentence
     let fallback = '';
     for (const line of filtered) {
       if (line.length > fallback.length) fallback = line;
@@ -150,7 +150,6 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
     }
     if (results.length > 0) return results;
 
-    // Fallback for newer/alternate news layouts
     const fallback = [];
     const anchors = Array.from(document.querySelectorAll('#search a, #rso a'));
     for (const a of anchors) {
@@ -165,7 +164,6 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
     return fallback;
   }
 
-  // Handle multiple web layouts
   const blocks = Array.from(
     document.querySelectorAll('div#search div.MjjYud, div#search div.g, div#search .tF2Cxc')
   );
@@ -182,7 +180,6 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
   }
   if (results.length > 0) return results;
 
-  // Fallback: collect all h3 links inside search area
   const fallback = [];
   const h3s = Array.from(document.querySelectorAll('div#search a h3, a h3'));
   for (const h3 of h3s) {
@@ -203,7 +200,6 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
         )
         result = resp.get("result", {}).get("result", {}).get("value", [])
         if isinstance(result, list):
-            # Deduplicate by link and keep the best snippet (longest non-empty)
             dedup: dict[str, dict] = {}
             ordered: list[str] = []
             for item in result:
@@ -230,18 +226,7 @@ async def _navigate_and_extract(ws_url: str, url: str) -> list[dict]:
         return []
 
 
-def main() -> int:
-    args = sys.argv[1:]
-    news = False
-    if "--news" in args:
-        news = True
-        args = [a for a in args if a != "--news"]
-
-    if len(args) < 1:
-        print("Usage: scripts/google_query.py [--news] <query>")
-        return 2
-
-    query = " ".join(args)
+def search_google(query: str, news: bool = False, chrome_debug_port: int | None = None) -> dict:
     url = (
         "https://www.google.com/search?q="
         + urllib.parse.quote_plus(query)
@@ -250,29 +235,17 @@ def main() -> int:
     if news:
         url += "&tbm=nws"
 
-    port = os.environ.get("CHROME_DEBUG_PORT", "9225")
+    port = chrome_debug_port or int(os.environ.get("CHROME_DEBUG_PORT", "9225"))
     list_url = f"http://localhost:{port}/json/list"
 
-    try:
-        targets = _json_get(list_url)
-    except Exception as exc:
-        print(f"Failed to query CDP targets: {exc}")
-        print("Is the Chromium container running with remote debugging enabled?")
-        return 1
-
+    targets = _json_get(list_url)
     page = next((t for t in targets if t.get("type") == "page"), None)
     if not page or not page.get("webSocketDebuggerUrl"):
-        print("No existing page target found. Open a tab first.")
-        return 1
+        _open_tab(port, url)
+        targets = _json_get(list_url)
+        page = next((t for t in targets if t.get("type") == "page"), None)
+        if not page or not page.get("webSocketDebuggerUrl"):
+            raise RuntimeError("No existing page target found. Open a tab first.")
 
-    try:
-        results = asyncio.run(_navigate_and_extract(page["webSocketDebuggerUrl"], url))
-        print(json.dumps({"query": query, "url": url, "results": results}, indent=2))
-        return 0
-    except Exception as exc:
-        print(f"Failed to navigate current tab via CDP: {exc}")
-        return 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    results = asyncio.run(_navigate_and_extract(page["webSocketDebuggerUrl"], url))
+    return {"query": query, "url": url, "results": results}
