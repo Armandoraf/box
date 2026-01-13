@@ -1,13 +1,10 @@
 FROM debian:bookworm-slim
 
-# Keep image small; Chromium + Xvfb + fonts + Python runtime
+# Keep image small; Chromium + Xvfb + fonts
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
        chromium \
        xvfb \
-       python3 \
-       python3-pip \
-       python3-venv \
        ca-certificates \
        fonts-liberation \
        fonts-noto-color-emoji \
@@ -19,26 +16,10 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 ENV DISPLAY=:99
-ENV PYTHONUNBUFFERED=1
 
 # Default args; override at runtime if needed
 ENV CHROMIUM_ARGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --display=:99 --remote-debugging-address=0.0.0.0 --remote-debugging-port=9223 about:blank"
 
-WORKDIR /app
-
-COPY requirements.txt /app/requirements.txt
-RUN python3 -m venv /opt/venv \
-  && /opt/venv/bin/pip install --no-cache-dir -r /app/requirements.txt
-
-ENV PATH="/opt/venv/bin:${PATH}"
-
-COPY app.py /app/app.py
-COPY router_app.py /app/router_app.py
-COPY box /app/box
-COPY bin/entrypoint.sh /app/bin/entrypoint.sh
-
-EXPOSE 8000 9225 5900 6080
-
-# Start Xvfb, Chromium, and API server
+# Start Xvfb and Chromium in the foreground
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["/app/bin/entrypoint.sh"]
+CMD ["bash", "-lc", "Xvfb :99 -screen 0 1280x720x24 & x11vnc -display :99 -forever -shared -rfbport 5900 -nopw & websockify --web=/usr/share/novnc 6080 localhost:5900 & socat TCP-LISTEN:9225,fork,bind=0.0.0.0 TCP:127.0.0.1:9223 & exec chromium $CHROMIUM_ARGS"]
