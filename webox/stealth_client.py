@@ -6,9 +6,9 @@ browser headers with User-Agent rotation.
 """
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 try:
     from curl_cffi import requests
@@ -40,6 +40,8 @@ class StealthResponse:
     tls_fingerprint: str
     content: bytes = b""
     content_encoding: str = ""
+    redirect_chain: List[str] = field(default_factory=list)
+    redirect_statuses: List[int] = field(default_factory=list)
 
 
 USER_AGENTS = {
@@ -204,6 +206,12 @@ def stealth_get(
             impersonate=fingerprint,
         )
 
+    history = getattr(response, "history", []) or []
+    redirect_chain = [str(item.url) for item in history if getattr(item, "url", None)]
+    redirect_statuses = [
+        item.status_code for item in history if getattr(item, "status_code", None)
+    ]
+
     return StealthResponse(
         status_code=response.status_code,
         text=response.text,
@@ -213,4 +221,6 @@ def stealth_get(
         tls_fingerprint=fingerprint,
         content=response.content,
         content_encoding=response.headers.get("content-encoding", ""),
+        redirect_chain=redirect_chain,
+        redirect_statuses=redirect_statuses,
     )
