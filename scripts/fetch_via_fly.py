@@ -30,13 +30,26 @@ def main() -> int:
         with urllib.request.urlopen(req, timeout=60) as resp:
             body = resp.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
+        body = ""
+        try:
+            body = exc.read().decode("utf-8")
+        except Exception:
+            body = ""
         if exc.code == 401 and not api_key:
             print(
                 "Unauthorized (401). WEBOX_API_KEY is not set. "
                 "Add it to .env or export it before running.",
                 file=sys.stderr,
             )
-        raise
+        if body:
+            try:
+                data = json.loads(body)
+                print(json.dumps(data, indent=2, sort_keys=True))
+            except json.JSONDecodeError:
+                print(body)
+        else:
+            print(f"HTTPError {exc.code}: {exc.reason}", file=sys.stderr)
+        return 1
     try:
         data = json.loads(body)
         print(json.dumps(data, indent=2, sort_keys=True))

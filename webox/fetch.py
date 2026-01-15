@@ -1,3 +1,4 @@
+import gzip
 import html.parser
 import io
 import logging
@@ -123,7 +124,16 @@ def fetch(
     content_type = (
         (resp.headers.get("content-type") or "").split(";")[0].strip().lower()
     )
-    is_pdf = content_type == "application/pdf" or str(resp.url).lower().endswith(".pdf")
+    url_lower = str(resp.url).lower()
+    is_pdf = content_type == "application/pdf" or url_lower.endswith(".pdf")
+    is_xml = content_type in {
+        "text/xml",
+        "application/xml",
+        "application/rss+xml",
+        "application/atom+xml",
+        "application/sitemap+xml",
+    } or url_lower.endswith((".xml", ".xml.gz"))
+    looks_gzip = url_lower.endswith(".gz") or resp.content[:2] == b"\x1f\x8b"
     html = resp.text or ""
     if is_pdf:
         extracted = _extract_pdf_text(resp.content)
@@ -139,6 +149,29 @@ def fetch(
             )
             raise ExtractionError("pdf_extraction_empty", "PDF text extraction produced no text")
         raw_text = extracted if include_raw_text else ""
+        html = ""
+    elif is_xml:
+        content_bytes = resp.content or b""
+        if looks_gzip and content_bytes:
+            try:
+                content_bytes = gzip.decompress(content_bytes)
+            except Exception as exc:
+                logger.warning(
+                    "webox fetch gzip_decompress_failed url=%s final_url=%s status=%s redirects=%s redirect_statuses=%s content_type=%s error=%s",
+                    url,
+                    resp.url,
+                    resp.status_code,
+                    redirect_chain,
+                    redirect_statuses,
+                    content_type,
+                    str(exc),
+                )
+                raise ExtractionError("gzip_decompress_failed", "Failed to decompress gzip content") from exc
+        xml_text = ""
+        if content_bytes:
+            xml_text = content_bytes.decode("utf-8", errors="replace")
+        extracted = xml_text
+        raw_text = xml_text if include_raw_text else ""
         html = ""
     else:
         extracted = _extract_trafilatura(html) if html else None
