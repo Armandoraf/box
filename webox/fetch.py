@@ -23,6 +23,19 @@ except Exception as exc:  # pragma: no cover
 logger = logging.getLogger("webox.fetch")
 
 
+class UpstreamFetchError(RuntimeError):
+    def __init__(self, status_code: int, url: str, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.url = url
+
+
+class ExtractionError(RuntimeError):
+    def __init__(self, kind: str, message: str) -> None:
+        super().__init__(message)
+        self.kind = kind
+
+
 class _TextExtractor(html.parser.HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -102,8 +115,10 @@ def fetch(
             redirect_chain,
             redirect_statuses,
         )
-        raise RuntimeError(
-            f"Upstream HTTP error {resp.status_code} while fetching {resp.url}"
+        raise UpstreamFetchError(
+            resp.status_code,
+            str(resp.url),
+            f"Upstream HTTP error {resp.status_code} while fetching {resp.url}",
         )
     content_type = (
         (resp.headers.get("content-type") or "").split(";")[0].strip().lower()
@@ -122,7 +137,7 @@ def fetch(
                 redirect_statuses,
                 content_type,
             )
-            raise RuntimeError("PDF text extraction produced no text")
+            raise ExtractionError("pdf_extraction_empty", "PDF text extraction produced no text")
         raw_text = extracted if include_raw_text else ""
         html = ""
     else:
@@ -138,7 +153,7 @@ def fetch(
                 content_type,
                 len(html),
             )
-            raise RuntimeError("HTML content extraction failed")
+            raise ExtractionError("html_extraction_failed", "HTML content extraction failed")
         raw_text = _to_text(html) if (include_raw_text and html) else ""
     return {
         "final_url": str(resp.url),

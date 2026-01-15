@@ -55,3 +55,11 @@ flyctl secrets set \
   --app "$APP_NAME"
 
 flyctl status --app "$APP_NAME"
+
+# Ensure at least one machine is running after deploy.
+machine_json="$(flyctl machines list --app "$APP_NAME" --json)"
+machine_id="$(jq -r '.[0].id // empty' <<<"$machine_json")"
+machine_state="$(jq -r '.[0].state // empty' <<<"$machine_json")"
+if [[ -n "$machine_id" && "$machine_state" != "started" ]]; then
+  flyctl machines start --app "$APP_NAME" "$machine_id"
+fi
