@@ -133,8 +133,19 @@ def fetch(
         "application/atom+xml",
         "application/sitemap+xml",
     } or url_lower.endswith((".xml", ".xml.gz"))
-    looks_gzip = url_lower.endswith(".gz") or resp.content[:2] == b"\x1f\x8b"
+    is_json = (
+        content_type in {"application/json", "text/json"}
+        or content_type.endswith("+json")
+        or url_lower.endswith(".json")
+    )
+    content_encoding = (resp.headers.get("content-encoding") or "").lower()
+    has_gzip_magic = resp.content[:2] == b"\x1f\x8b"
+    looks_gzip = has_gzip_magic
     html = resp.text or ""
+    if not is_xml and html:
+        xml_prefix = html.lstrip()[:200].lower()
+        if xml_prefix.startswith(("<?xml", "<rss", "<feed", "<urlset", "<sitemapindex")):
+            is_xml = True
     if is_pdf:
         extracted = _extract_pdf_text(resp.content)
         if resp.content and not extracted:
@@ -152,6 +163,24 @@ def fetch(
         html = ""
     elif is_xml:
         content_bytes = resp.content or b""
+        if url_lower.endswith(".gz") and not looks_gzip and content_bytes:
+            logger.warning(
+                "webox fetch gzip_hint_without_signature url=%s final_url=%s status=%s content_type=%s content_encoding=%s",
+                url,
+                resp.url,
+                resp.status_code,
+                content_type,
+                content_encoding,
+            )
+        if ("gzip" in content_encoding) and not has_gzip_magic and content_bytes:
+            logger.warning(
+                "webox fetch gzip_encoding_without_signature url=%s final_url=%s status=%s content_type=%s content_encoding=%s",
+                url,
+                resp.url,
+                resp.status_code,
+                content_type,
+                content_encoding,
+            )
         if looks_gzip and content_bytes:
             try:
                 content_bytes = gzip.decompress(content_bytes)
@@ -173,6 +202,11 @@ def fetch(
         extracted = xml_text
         raw_text = xml_text if include_raw_text else ""
         html = ""
+    elif is_json:
+        json_text = resp.text or ""
+        extracted = json_text
+        raw_text = json_text if include_raw_text else ""
+        html = ""
     else:
         extracted = _extract_trafilatura(html) if html else None
         if html and extracted is None:
@@ -186,7 +220,7 @@ def fetch(
                 content_type,
                 len(html),
             )
-            raise ExtractionError("html_extraction_failed", "HTML content extraction failed")
+            extracted = ""
         raw_text = _to_text(html) if (include_raw_text and html) else ""
     return {
         "final_url": str(resp.url),

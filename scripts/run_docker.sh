@@ -5,4 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 # Spin up the app on :8080 using docker compose and .env if present.
-docker compose up --build
+# Default to detached; pass args to override if needed.
+if [ "$#" -eq 0 ]; then
+  docker compose up --build -d
+else
+  docker compose up --build "$@"
+fi
