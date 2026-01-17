@@ -1,3 +1,4 @@
+import logging
 import os
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -8,6 +9,7 @@ from webox.search import search_google
 
 app = FastAPI(title="webox")
 _API_KEY = os.environ.get("WEBOX_API_KEY", "")
+logger = logging.getLogger("webox.app")
 
 
 def _require_api_key(x_api_key: str | None = Header(None)) -> None:
@@ -31,6 +33,12 @@ def fetch_endpoint(
     try:
         return fetch(url, timeout, {}, raw, raw_text)
     except UpstreamFetchError as exc:
+        logger.warning(
+            "webox fetch upstream_error url=%s status=%s message=%s",
+            url,
+            exc.status_code,
+            str(exc),
+        )
         return JSONResponse(
             status_code=502,
             content={
@@ -43,6 +51,12 @@ def fetch_endpoint(
             },
         )
     except ExtractionError as exc:
+        logger.warning(
+            "webox fetch extraction_error url=%s kind=%s message=%s",
+            url,
+            exc.kind,
+            str(exc),
+        )
         return JSONResponse(
             status_code=502,
             content={
@@ -54,6 +68,7 @@ def fetch_endpoint(
             },
         )
     except Exception as exc:
+        logger.exception("webox fetch unexpected_error url=%s error=%s", url, str(exc))
         return JSONResponse(
             status_code=502,
             content={
